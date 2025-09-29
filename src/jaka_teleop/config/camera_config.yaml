@@ -1,0 +1,32 @@
+# camera_config.yaml
+# 摄像头配置文件示例
+
+cameras:
+  # 主摄像头 - USB摄像头
+  main_camera:
+    type: usb
+    device_id: 0
+    width: 640
+    height: 480
+    fps: 5.0
+    resize: [640, 480]  # 可选：调整输出尺寸
+    enhance: false       # 可选：图像增强
+    contrast: 1.2
+    brightness: 10
+    blur: false
+    
+  # 辅助摄像头 - USB摄像头
+  auxiliary_camera:
+    type: usb  
+    device_id: 2
+    width: 640
+    height: 480
+    fps: 5.0
+    enhance: false
+    
+
+# 全局设置
+global:
+  publish_rate: 5.0    # 发布频率
+  image_quality: 80     # JPEG压缩质量
+  auto_exposure: true   # 自动曝光

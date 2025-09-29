@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>jaka_msgs</name>
+  <version>0.0.0</version>
+  <description>The jaka_msgs package</description>
+  
+  <!-- Maintainer information -->
+  <maintainer email="meddy@todo.todo">meddy</maintainer>
+  
+  <!-- License information -->
+  <license>TODO</license>
+  
+  <!-- Dependencies for ROS2 -->  
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rosidl_runtime_cpp</build_depend>
+  <build_depend>rosidl_runtime_py</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  
+  <build_export_depend>rosidl_runtime_cpp</build_export_depend>
+  <build_export_depend>rosidl_runtime_py</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+
+  <exec_depend>rosidl_runtime_cpp</exec_depend>
+  <exec_depend>rosidl_runtime_py</exec_depend>  
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <!-- Export section (optional) -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+    <build_type>ament_cmake</build_type>
+    <member_of_group>rosidl_interface_packages</member_of_group>
+  </export>
+  
+</package>

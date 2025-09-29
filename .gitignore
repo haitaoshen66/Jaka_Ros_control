@@ -1,0 +1,37 @@
+# 忽略除了 src 目录以外的所有内容
+*
+!src/
+!src/**
+
+# 保留一些重要的根目录文件（可选）
+!.gitignore
+!README.md
+!release_notes.md
+!jaka_ros2_documentation.md
+!jaka_ros2_documentation-中文版.md
+
+# 忽略常见的构建和临时文件
+build/
+install/
+log/
+*.pyc
+__pycache__/
+*.so
+*.o
+*.a
+*.la
+*.lo
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 忽略压缩文件
+*.tar.gz
+*.zip
+*.rar
+
+# 忽略临时脚本
+temp.sh 
