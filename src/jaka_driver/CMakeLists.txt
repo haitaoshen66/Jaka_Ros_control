@@ -35,7 +35,7 @@ add_executable(servoj_demo src/servoj_demo.cpp)
 add_executable(servop_demo src/servop_demo.cpp)
 add_executable(servoj src/servoj.cpp)
 add_executable(griper src/griper.cpp)
-
+add_executable(zx_gripper_test src/zx_gripper_test.cpp)
 # Link libraries
 ament_target_dependencies(jaka_driver
   rclcpp
@@ -103,6 +103,16 @@ ament_target_dependencies(griper
   action_msgs
 )
 
+ament_target_dependencies(zx_gripper_test
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  jaka_msgs
+  # moveit_msgs
+  action_msgs
+)
+
 # For including directories in ROS 2
 target_include_directories(jaka_driver
   PUBLIC
@@ -152,6 +162,13 @@ target_include_directories(griper
     ${ament_INCLUDE_DIRS}
 )
 
+target_include_directories(zx_gripper_test
+  PUBLIC
+    include
+  PRIVATE
+    ${ament_INCLUDE_DIRS}
+)
+
 # Specify where to find external libraries
 set(LIBRARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
@@ -166,6 +183,7 @@ target_link_libraries(servoj_demo ${LIBRARY_DIR}/libjakaAPI.so)
 target_link_libraries(servop_demo ${LIBRARY_DIR}/libjakaAPI.so)
 target_link_libraries(servoj ${LIBRARY_DIR}/libjakaAPI.so)
 target_link_libraries(griper ${LIBRARY_DIR}/libjakaAPI.so)
+target_link_libraries(zx_gripper_test ${LIBRARY_DIR}/libjakaAPI.so)
 
 # Install executables
 install(TARGETS
@@ -176,6 +194,7 @@ install(TARGETS
   servop_demo
   servoj
   griper
+  zx_gripper_test
   DESTINATION lib/${PROJECT_NAME}
 )
 
