@@ -16,7 +16,6 @@ install/
 log/
 *.pyc
 __pycache__/
-*.so
 *.o
 *.a
 *.la
@@ -34,4 +33,4 @@ __pycache__/
 *.rar
 
 # 忽略临时脚本
-temp.sh 
+# temp.sh 
