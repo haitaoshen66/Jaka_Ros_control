@@ -6,8 +6,7 @@ ENABLE_URL = f"{API_BASE_URL}/enable"
 MOVETO_URL = f"{API_BASE_URL}/moveto"
 STATUS_URL = f"{API_BASE_URL}/status"
 
-HEAD_PITCH_MAX = 35.0   # 鞠躬最大俯仰角（度）
-HEAD_PITCH_MIN = 0.0    # 恢复初始俯仰角（度）
+HEIGHT_OFFSET = 10.0  # 高度升降偏移量（单位：mm或根据API定义）
 
 # 1. 使能
 try:
@@ -25,38 +24,26 @@ try:
     resp = requests.get(STATUS_URL, timeout=1.0)
     state = resp.json()
     current_height = state[0]["pos"]
+    num1 = state[1]["pos"]
     current_rotation = state[2]["pos"]
-    print(f"当前高度: {current_height}, 当前头部旋转: {current_rotation}")
+    num3 = state[3]["pos"]
+    print(f"当前高度: {current_height}, 当前其他参数: num1={num1}, 旋转={current_rotation}, num3={num3}")
 except Exception as e:
     print(f"获取状态异常: {e}")
     exit(1)
 
-# 3. 鞠躬动作：低头
+# 3. 升高动作
 move_cmd = {
-    "pos": [current_height, 0, current_rotation, HEAD_PITCH_MAX],
+    "pos": [current_height, num1, current_rotation, num3-10],
     "vel": 100,
     "acc": 100
 }
 try:
     resp = requests.post(MOVETO_URL, json=move_cmd, timeout=1.0)
     if resp.status_code == 200:
-        print(f"鞠躬：头部低头到 {HEAD_PITCH_MAX}°")
+        print(f"升高：高度增加 {HEIGHT_OFFSET} 到 {current_height + HEIGHT_OFFSET}")
     else:
-        print(f"鞠躬动作失败: {resp.status_code}")
+        print(f"升高动作失败: {resp.status_code}")
 except Exception as e:
-    print(f"鞠躬动作异常: {e}")
-    exit(1)
-
-time.sleep(1.5)  # 保持鞠躬动作
-
-# 4. 恢复抬头
-move_cmd["pos"][3] = HEAD_PITCH_MIN
-try:
-    resp = requests.post(MOVETO_URL, json=move_cmd, timeout=1.0)
-    if resp.status_code == 200:
-        print(f"恢复：头部抬起到 {HEAD_PITCH_MIN}°")
-    else:
-        print(f"恢复动作失败: {resp.status_code}")
-except Exception as e:
-    print(f"恢复动作异常: {e}")
+    print(f"升高动作异常: {e}")
     exit(1)

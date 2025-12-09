@@ -32,7 +32,12 @@ class CameraManager:
             camera_type = camera_config.get('type', 'usb')
             
             if camera_type == 'usb':
-                cap = cv2.VideoCapture(camera_config.get('device_id', 0))
+                device_id = camera_config.get('device_id', 0)
+                # 用 V4L2 后端打开，避免 GStreamer 管线报错
+                cap = cv2.VideoCapture(device_id, cv2.CAP_V4L2)
+                if camera_config.get('use_mjpg', True):
+                    # MJPG 可以减小带宽占用，常见 USB 摄像头支持
+                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
             elif camera_type == 'ip':
                 cap = cv2.VideoCapture(camera_config.get('url'))
             elif camera_type == 'realsense':

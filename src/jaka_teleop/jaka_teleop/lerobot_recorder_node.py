@@ -26,9 +26,9 @@ class LerobotRecorderNode(Node):
         super().__init__("lerobot_recorder_node")
         
         # 参数设置
-        self.declare_parameter("output_dir", "/home/sht/DIJA/jaka_teleop_datasets")
+        self.declare_parameter("output_dir", "/home/sht/DIJA/jaka_ros2/src/jaka_teleop/raw_data")
         self.declare_parameter("episode_name", "episode")
-        self.declare_parameter("fps", 5.0)  # 记录频率
+        self.declare_parameter("fps", 20.0)  # 记录频率默认 20fps
         
         # 获取参数
         self.output_dir = self.get_parameter("output_dir").get_parameter_value().string_value
@@ -38,7 +38,17 @@ class LerobotRecorderNode(Node):
         # 创建输出目录
         self.dataset_dir = Path(self.output_dir)
         self.dataset_dir.mkdir(parents=True, exist_ok=True)
-        
+        # 采集配置
+        self.target_image_size = (640, 640)
+        self.declare_parameter(
+            "camera_names",
+            ["front", "gripper", "camera_0", "camera_1"],
+        )  # 默认同时尝试标准名与camera_node默认名
+        self.video_writers = {}
+        self.video_paths = {}
+        self.video_frame_counts = {}
+        self.current_episode_dir = None
+        self.video_fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         # 记录状态
         self.is_recording = False
         self.episode_index = 0
@@ -161,11 +171,13 @@ class LerobotRecorderNode(Node):
         
     def setup_camera_subscriptions(self):
         """设置摄像头订阅"""
-        # 动态订阅所有可用的摄像头
-        # 这个方法可以在运行时调用来更新摄像头订阅
-        known_cameras = ['main_camera', 'auxiliary_camera', 'camera_0', 'camera_1']
-        
-        for camera_name in known_cameras:
+        # 初始订阅一组预期的摄像头名称，可通过参数覆盖
+        initial_cameras = (
+            self.get_parameter("camera_names")
+            .get_parameter_value()
+            .string_array_value
+        )
+        for camera_name in initial_cameras:
             self.subscribe_to_camera(camera_name)
     
     def subscribe_to_camera(self, camera_name: str):
@@ -182,6 +194,8 @@ class LerobotRecorderNode(Node):
         """接收摄像头图像"""
         try:
             cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            # 统一尺寸到 640x640，便于后续训练和播放
+            cv_image = cv2.resize(cv_image, self.target_image_size, interpolation=cv2.INTER_LINEAR)
             self.latest_camera_images[camera_name] = {
                 'image': cv_image,
                 'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
@@ -213,11 +227,18 @@ class LerobotRecorderNode(Node):
 
     def start_recording(self):
         """开始录制"""
+        self.close_video_writers()
+
         self.is_recording = True
         self.current_episode_data = []
         self.current_timestamp = 0
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.current_episode_name = f"{self.episode_name}_{self.episode_index:04d}_{timestamp}"
+        self.current_episode_dir = self.dataset_dir / self.current_episode_name
+        self.current_episode_dir.mkdir(exist_ok=True)
+        self.video_writers = {}
+        self.video_paths = {}
+        self.video_frame_counts = {}
         
         self.get_logger().info(f"🔴 开始录制episode: {self.current_episode_name}")
 
@@ -234,6 +255,7 @@ class LerobotRecorderNode(Node):
             self.get_logger().info(f"⏹️ 录制完成，保存了 {len(self.current_episode_data)} 帧数据")
         else:
             self.get_logger().warn("⚠️ 没有录制到数据")
+            self.close_video_writers()
 
     def record_data_callback(self):
         """定期记录数据帧"""
@@ -260,35 +282,74 @@ class LerobotRecorderNode(Node):
             'gripper_state': self.latest_gripper_state,
             
             # 摄像头图像
-            'camera_images': {}
+            'camera_frames': {}
         }
         
-        # 复制摄像头图像
+        # 记录摄像头帧到视频文件，只保留轻量级元数据
         for camera_name, image_data in self.latest_camera_images.items():
-            frame_data['camera_images'][camera_name] = image_data.copy()
+            frame_data['camera_frames'][camera_name] = {
+                'timestamp': image_data['timestamp'],
+                'frame_id': image_data['frame_id'],
+            }
+            self.write_frame_to_video(camera_name, image_data['image'])
         
         self.current_episode_data.append(frame_data)
         self.current_timestamp += 1.0 / self.fps
 
+    def write_frame_to_video(self, camera_name: str, frame):
+        """将当前帧写入对应摄像头的MP4文件"""
+        if self.current_episode_dir is None:
+            return
+
+        if camera_name not in self.video_writers:
+            video_path = self.current_episode_dir / f"{camera_name}.mp4"
+            height, width, _ = frame.shape
+            writer = cv2.VideoWriter(
+                str(video_path),
+                self.video_fourcc,
+                self.fps,
+                (width, height),
+            )
+            if not writer.isOpened():
+                self.get_logger().warn(f"无法打开视频文件用于写入: {video_path}")
+                return
+            self.video_writers[camera_name] = writer
+            self.video_paths[camera_name] = video_path.name
+            self.video_frame_counts[camera_name] = 0
+            self.get_logger().info(f"🎥 开始保存摄像头 {camera_name} 视频 -> {video_path}")
+
+        writer = self.video_writers.get(camera_name)
+        if writer is not None:
+            writer.write(frame)
+            self.video_frame_counts[camera_name] += 1
+
+    def close_video_writers(self):
+        """释放所有视频写入器"""
+        for cam, writer in list(self.video_writers.items()):
+            try:
+                if writer is not None:
+                    writer.release()
+            except Exception:
+                pass
+        self.video_writers = {}
+
     def save_episode(self):
-        """保存episode到HDF5文件（Lerobot格式）"""
-        episode_dir = self.dataset_dir / self.current_episode_name
+        """保存episode到HDF5文件（仅轨迹），视频保存在同目录"""
+        episode_dir = self.current_episode_dir or (self.dataset_dir / self.current_episode_name)
         episode_dir.mkdir(exist_ok=True)
-        
+
+        # 确保视频写入完成
+        self.close_video_writers()
+
         # 保存HDF5格式数据
         hdf5_path = episode_dir / "data.hdf5"
         
         with h5py.File(hdf5_path, 'w') as f:
-            # 创建基本组
-            observation_group = f.create_group('observation')
             trajectory_group = f.create_group('trajectory')
             
             # 准备数据数组
             num_frames = len(self.current_episode_data)
-            
-            # 保存观测数据（摄像头）
-            self.save_observation_data(observation_group, num_frames)
-            
+
             # 保存轨迹数据（位置和关节）
             self.save_trajectory_data(trajectory_group, num_frames)
             
@@ -297,6 +358,8 @@ class LerobotRecorderNode(Node):
             f.attrs['episode_name'] = self.current_episode_name
             f.attrs['num_frames'] = num_frames
             f.attrs['created_at'] = datetime.now().isoformat()
+            if self.video_paths:
+                f.attrs['video_files'] = json.dumps(self.video_paths)
         
         # 保存JSON格式的元数据
         metadata = {
@@ -305,9 +368,11 @@ class LerobotRecorderNode(Node):
             'fps': self.fps,
             'created_at': datetime.now().isoformat(),
             'data_keys': {
-                'observation': self.get_observation_keys(),
+                'observation_videos': self.get_observation_keys(),
                 'trajectory': self.get_trajectory_keys()
-            }
+            },
+            'video_files': self.video_paths,
+            'video_frame_counts': self.video_frame_counts,
         }
         
         with open(episode_dir / "metadata.json", 'w') as f:
@@ -315,40 +380,12 @@ class LerobotRecorderNode(Node):
         
         self.get_logger().info(f"💾 Episode保存至: {episode_dir}")
 
-    def save_observation_data(self, obs_group, num_frames):
-        """保存观测数据（仅摄像头图像）"""
-        # 收集所有摄像头名称
-        camera_names = set()
-        for frame in self.current_episode_data:
-            camera_names.update(frame['camera_images'].keys())
-        
-        # 为每个摄像头创建数据集
-        for i, camera_name in enumerate(sorted(camera_names), 1):
-            images = []
-            for frame in self.current_episode_data:
-                if camera_name in frame['camera_images']:
-                    image = frame['camera_images'][camera_name]['image']
-                    images.append(image)
-                else:
-                    # 填充空图像
-                    if images:
-                        empty_image = np.zeros_like(images[0])
-                    else:
-                        empty_image = np.zeros((480, 640, 3), dtype=np.uint8)
-                    images.append(empty_image)
-            
-            if images:
-                # 使用camera1, camera2, camera3... 格式
-                dataset_name = f'camera{i}'
-                obs_group.create_dataset(dataset_name, data=np.array(images))
-                self.get_logger().info(f"📷 保存摄像头数据: observation/{dataset_name} - {len(images)} 帧")
-
     def save_trajectory_data(self, traj_group, num_frames):
         """保存轨迹数据"""
         # trajectory/position: (x, y, z, orientation_x, orientation_y, orientation_z, gripper)
         position_data = []
         
-        # trajectory/joint: 6个关节角度
+        # trajectory/joint: 6个关节角度 + gripper
         joint_data = []
         
         for frame in self.current_episode_data:
@@ -375,8 +412,10 @@ class LerobotRecorderNode(Node):
                     joints.append(0.0)
             else:
                 joints = [0.0] * 6
+            # 将 gripper 状态附加到关节数组末尾
+            joints_with_gripper = joints + [gripper]
             
-            joint_data.append(joints)
+            joint_data.append(joints_with_gripper)
         
         # 保存到HDF5
         traj_group.create_dataset('position', data=np.array(position_data))
@@ -387,18 +426,7 @@ class LerobotRecorderNode(Node):
 
     def get_observation_keys(self):
         """获取观测数据的键"""
-        keys = []
-        
-        # 添加摄像头键
-        camera_names = set()
-        for frame in self.current_episode_data:
-            camera_names.update(frame['camera_images'].keys())
-        
-        # 使用camera1, camera2, camera3... 格式
-        for i in range(1, len(camera_names) + 1):
-            keys.append(f'camera{i}')
-        
-        return keys
+        return list(self.video_paths.keys())
 
     def get_trajectory_keys(self):
         """获取轨迹数据的键"""

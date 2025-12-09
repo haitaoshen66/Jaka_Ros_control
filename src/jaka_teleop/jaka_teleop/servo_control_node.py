@@ -38,7 +38,7 @@ class ServoControlNode(Node):
 
         # 参数设置
         # self.declare_parameter("control_scale", 1.0)
-        self.scale = 1
+        self.scale = 1.5
         self.reset_sub=self.create_subscription(Bool, "/teleop/reset_pose", self.reset_callback, 1)
         self.tool_pos_subscription = self.create_subscription(
             TwistStamped, "/jaka_driver/tool_position", self.get_robot_matrix, 5
@@ -47,15 +47,28 @@ class ServoControlNode(Node):
         self.subscription = self.create_subscription(
             String, "/oculus/transforms", self.transform_callback, 10
         )
-
-        
+        self.subscription1 = self.create_subscription(
+            Bool,
+            '/teleop/gripper_cmd',
+            self.gripper_callback,
+            10
+        )
+        self.subscription2 = self.create_subscription(
+            Bool,
+            '/teleop/record',
+            self.record_key_callback,
+            10
+        )
         # Reset 模式控制
         self.reset_mode = False
         self.prev_matrix = None
         self.prev_robot_matrix = None
         self.init_robot_matrix = None  # 初始为单位矩阵
-        
-
+        self.is_recording = False
+        self.gripper_state = 1
+        self.max_record_count = 100000
+        self.csv_dir = '/home/sht/DIJA/Pr/action_sequence/action_csv'  # 指定保存文件夹
+        self.csv_file_path = None  # 记录当前文件路径
         # 创建伺服控制客户端
         self.servo_client = JakaServoClientAsync()
         future = self.servo_client.enable_servo_mode()
@@ -63,7 +76,33 @@ class ServoControlNode(Node):
         response = future.result()
         self.servo_client.get_logger().info('servo mode enable %s' % (response.message))
 
+    def gripper_callback(self, msg):
+            self.gripper_state = 1 if msg.data else 0
 
+    def record_key_callback(self, msg):
+        import os
+        import datetime
+        if msg.data and not self.is_recording:
+            self.get_logger().info("开始记录 servo_p 数据到 CSV")
+            self.is_recording = True
+            self.recorded_data = []
+            self.record_count = 0
+            # 自动生成文件名
+            os.makedirs(self.csv_dir, exist_ok=True)
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            self.csv_file_path = os.path.join(self.csv_dir, f"servo_record_bhc_{timestamp}.csv")
+            self.get_logger().info(f"记录文件路径: {self.csv_file_path}")
+        elif not msg.data and self.is_recording:
+            self.get_logger().info("停止记录，保存 CSV 文件")
+            self.is_recording = False
+            # 写入 CSV 文件
+            import csv
+            with open(self.csv_file_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["dx", "dy", "dz", "droll", "dpitch", "dyaw", "gripper"])
+                for row in self.recorded_data:
+                    writer.writerow(row)
+            self.get_logger().info(f"已保存 {self.record_count} 条数据到 {self.csv_file_path}")
 
     def get_robot_matrix(self, msg: TwistStamped):
         """
@@ -156,13 +195,30 @@ class ServoControlNode(Node):
         # 更新历史
         self.prev_matrix = matrix
 
+        # 记录数据到 CSV
+        if self.is_recording and self.record_count < self.max_record_count:
+            row = scaled_delta[:6] + [self.gripper_state]
+            self.recorded_data.append(row)
+            self.record_count += 1
+            self.get_logger().info(f"已记录第 {self.record_count} 条数据: {row}")
+            if self.record_count >= self.max_record_count:
+                self.get_logger().info("已达到最大记录数，自动停止记录并保存 CSV 文件")
+                self.is_recording = False
+                import csv
+                with open(self.csv_file_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["dx", "dy", "dz", "droll", "dpitch", "dyaw", "gripper"])
+                    for r in self.recorded_data:
+                        writer.writerow(r)
+                self.get_logger().info(f"已保存 {self.record_count} 条数据到 {self.csv_file_path}")
+
     def compute_pose_delta(self, prev, current):
         # 相对位置（m → mm）
         dp = current[:3, 3] - prev[:3, 3]
         dp_mm = dp * 1000.0
 
         # Oculus → JAKA 坐标轴映射
-        T = np.array([[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+        T = np.array([[0.0, -1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, -1.0]])
         delta_xyz = T @ dp_mm
 
         # 姿态增量（旋转矩阵）
@@ -204,6 +260,7 @@ class ServoControlNode(Node):
             float(delta_xyz[0]),
             float(delta_xyz[1]),
             float(delta_xyz[2]),
+
             self.normalize_angle(d_roll),
             self.normalize_angle(d_pitch),
             self.normalize_angle(d_yaw),

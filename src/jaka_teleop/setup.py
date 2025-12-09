@@ -25,7 +25,7 @@ setup(
             'base_node = jaka_teleop.base_node:main',
             'button_node = jaka_teleop.button_node:main',
             'lift_node = jaka_teleop.lift_node:main',
-            'gripper_node = jaka_teleop.gripper_node:main',
+            'gripper_node_zx = jaka_teleop.gripper_node_zx:main',
             'servo_control_node = jaka_teleop.servo_control_node:main',
             'workspace_zone_node = jaka_teleop.workspace_zone_node:main',
             'oculus_reader_node = jaka_teleop.oculus_reader_node:main',

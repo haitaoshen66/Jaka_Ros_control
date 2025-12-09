@@ -1,0 +1,16 @@
+{
+  "episode_name": "jaka_teleop_0000_20251208_231036",
+  "num_frames": 1271,
+  "fps": 20.0,
+  "created_at": "2025-12-08T23:11:44.648354",
+  "data_keys": {
+    "observation": [
+      "camera1",
+      "camera2"
+    ],
+    "trajectory": [
+      "position",
+      "joint"
+    ]
+  }
+}

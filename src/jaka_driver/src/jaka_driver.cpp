@@ -93,7 +93,7 @@ uint16_t calculateModbusCRC(const uint8_t* data, size_t length) {
     }
     return crc;
 }
-bool gripper_init_enable_callback(const shared_ptr<jaka_msgs::srv::ServoMoveEnable::Request> request,
+bool gripper_init_enable_callback(const shared_ptr<jaka_msgs::srv::ServoMoveEnable::Request> request [[maybe_unused]],
     shared_ptr<jaka_msgs::srv::ServoMoveEnable::Response> response)
 {
     // int ret = robot.servo_move_enable(enable);
@@ -1001,7 +1001,7 @@ void re_enable_callback(const std_msgs::msg::Bool::SharedPtr msg) {
         RCLCPP_INFO(rclcpp::get_logger("jaka_driver"), "✅ 已成功重新使能");
 
         auto request = std::make_shared<jaka_msgs::srv::Move::Request>();
-        request->pose = {1.5,-0.763,-1.176,-0.159,-1.0,-0.67};
+        request->pose = {1.50,-1,-1.0,0,-0.8,-0.78};
         request->has_ref = false;
         request->ref_joint = {0};
         request->mvvelo = 5;
@@ -1012,7 +1012,7 @@ void re_enable_callback(const std_msgs::msg::Bool::SharedPtr msg) {
         request->index = 0;
 
         auto future = joint_move_client->async_send_request(request,
-            [](rclcpp::Client<jaka_msgs::srv::Move>::SharedFuture response) {
+            [](rclcpp::Client<jaka_msgs::srv::Move>::SharedFuture response [[maybe_unused]]) {
                 RCLCPP_INFO(rclcpp::get_logger("jaka_driver"), "🏁 JointMove 已响应（异步）");
                 is_reset_running = false;
             });

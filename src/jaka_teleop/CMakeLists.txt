@@ -52,7 +52,7 @@ install(PROGRAMS
   jaka_teleop/base_node.py
   jaka_teleop/button_node.py
   jaka_teleop/lift_node.py
-  jaka_teleop/gripper_node.py
+  jaka_teleop/gripper_node_zx.py
   jaka_teleop/servo_control_node.py
   jaka_teleop/workspace_zone_node.py
   jaka_teleop/oculus_reader.py

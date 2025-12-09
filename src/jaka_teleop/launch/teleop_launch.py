@@ -27,12 +27,12 @@ def generate_launch_description():
             name='base_node',
             output='screen'
         ),
-        # Node(
-        #     package='jaka_teleop',
-        #     executable='gripper_node',
-        #     name='gripper_node',
-        #     output='screen'
-        # ),
+        Node(
+            package='jaka_teleop',
+            executable='gripper_node_zx',
+            name='gripper_node_zx',
+            output='screen'
+        ),
         Node(
             package='jaka_teleop',
             executable='lift_node',
@@ -52,7 +52,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {'config_file': '/home/sht/DIJA/jaka_ros2/src/jaka_teleop/config/camera_config.yaml'},
-                {'publish_rate': 5.0},
+                {'publish_rate': 20.0},
                 {'image_quality': 80}
             ]
         ),
@@ -68,9 +68,10 @@ def generate_launch_description():
             name='lerobot_recorder_node',
             output='screen',
             parameters=[
-                {'output_dir': '/home/sht/DIJA/lerobot_datasets'},
+                {'output_dir': '/home/sht/DIJA/jaka_ros2/src/jaka_teleop/raw_data'},
                 {'episode_name': 'jaka_teleop'},
-                {'fps': 5.0}
+                {'fps': 20.0},
+                {'camera_names': ['camera_0', 'camera_1']}
             ]
         ),
         # Node(

@@ -28,13 +28,16 @@ class ButtonsNode(Node):
         self.gripper_pub = self.create_publisher(Bool, "/teleop/gripper_cmd", 10)
         self.lift_pub = self.create_publisher(String, "/teleop/lift_cmd", 10)
         self.enable_pub = self.create_publisher(Bool, "/teleop/enable", 10)
+        self.record_pub = self.create_publisher(Bool, "/teleop/record", 10)
         # 头部旋转
         self.head_pub = self.create_publisher(Twist, "/teleop/head_cmd", 10)
         # 控制比例（快慢切换）
         # self.declare_parameter("control_scale", 1.0)  # 默认1.0（快）
         self.reseting = False
+        self.recording = False
         self.last_reset_button = False
         self.last_mode_button = False
+        self.last_record_button = False
         # 状态缓存
         self.last_gripper_state = None  # 避免重复发
         self.last_buttons = {}
@@ -68,17 +71,23 @@ class ButtonsNode(Node):
             self.reset_pub.publish(Bool(data=True))
             self.workspace_pub.publish(String(data="high"))
 
-        if buttons.get("A") and buttons.get("B"):
-            # self.get_logger().info("切换工作区间: 中")
-            self.reseting = True
-            self.reset_pub.publish(Bool(data=True))
-            self.workspace_pub.publish(String(data="mid"))
+        # if buttons.get("A") and buttons.get("B"):
+        #     # self.get_logger().info("切换工作区间: 中")
+        #     self.reseting = True
+        #     self.reset_pub.publish(Bool(data=True))
+        #     self.workspace_pub.publish(String(data="mid"))
 
-        if buttons.get("A") and buttons.get("X"):
-            # self.get_logger().info("切换工作区间: 低")
-            self.reseting = True
-            self.reset_pub.publish(Bool(data=True))
-            self.workspace_pub.publish(String(data="low"))
+        if buttons.get("A") and buttons.get("X") and not self.last_record_button:
+            # self.get_logger().info("切换工作区间: 低"
+            if self.recording == True:
+                self.recording = False
+                self.get_logger().info("✅ 结束录制")
+                self.record_pub.publish(Bool(data=False))
+            else:
+                self.recording = True
+                self.get_logger().info("🔴 开始录制")
+                self.record_pub.publish(Bool(data=True))
+        self.last_record_button = (buttons.get("A") and buttons.get("X"))
 
         # === 左手离散功能 ===
         # cur_mode_button = buttons.get("X")

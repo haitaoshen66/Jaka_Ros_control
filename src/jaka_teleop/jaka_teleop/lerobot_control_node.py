@@ -45,7 +45,7 @@ class LerobotControlNode(Node):
         try:
             buttons = json.loads(msg.data)
             # 检查X按钮是否被按下（边缘触发）
-            if buttons.get('X', False) and not getattr(self, '_prev_x_pressed', False):
+            if (buttons.get('X', False) and not buttons.get('A', False) and not getattr(self, '_prev_x_pressed', False)):
                 self.toggle_recording()
 
             self._prev_x_pressed = buttons.get('X', False)
