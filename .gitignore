@@ -34,3 +34,4 @@ __pycache__/
 
 # 忽略临时脚本
 # temp.sh 
+src/jaka_teleop/raw_data/*.hdf5
